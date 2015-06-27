@@ -1,0 +1,18 @@
+{
+	"name": "mockingfish-server",
+	"version": "0.0.1",
+	"description": "API server for Mocking Fish app",
+	"author": "Hakon <hakon@madrona.com>",
+	"scripts": {
+		"start": "node server.js"
+	},
+	"main": "server.js",
+	"respository": {
+		"type": "git",
+		"url": "https://github.com/hverespej/mockingfish-api-server"
+	},
+	"dependencies": {
+		"restify": "3.x.x",
+		"bunyan": "1.4.x"
+	}
+}
