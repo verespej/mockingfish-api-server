@@ -54,6 +54,55 @@ server.get('/videos/', restify.serveStatic({
 	directory: __dirname
 }));
 
+// List video mixes
+server.get('/mixes', function(req, res, next) {
+	fs.readdir(__dirname + '/mixes', function(err, files) {
+		if (err) {
+			res.status(500).send({ msg: 'Error reading file', error: err });
+			return next(err);
+		}
+		var list = files.map(function(fileName) {
+			return {
+				id: fileName,
+				path: '/mixes/' + fileName
+			};
+		});
+		res.send(list);
+		return next();
+	});
+});
+
+// Get video mix
+server.get('/mixes/', restify.serveStatic({
+	directory: __dirname
+}));
+
+// List audio clips
+server.get('/clips', function(req, res, next) {
+	fs.readdir(__dirname + '/clips', function(err, files) {
+		if (err) {
+			res.status(500).send({ msg: 'Error reading file', error: err });
+			return next(err);
+		}
+		var list = files.map(function(fileName) {
+			return {
+				id: fileName,
+				path: '/clips/' + fileName
+			};
+		});
+		res.send(list);
+		return next();
+	});
+});
+
+// Get audio clip
+server.get('/clips/', restify.serveStatic({
+	directory: __dirname
+}));
+
+
+
+
 server.listen(process.env.PORT || 5000, function() {
 	console.log(server.name + ' listening at ' + server.url);
 });
