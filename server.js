@@ -54,7 +54,7 @@ server.get('/videos/', restify.serveStatic({
 	directory: __dirname
 }));
 
-server.listen(8001, function() {
+server.listen(process.env.PORT || 5000, function() {
 	console.log(server.name + ' listening at ' + server.url);
 });
 
