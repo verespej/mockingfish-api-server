@@ -1,5 +1,5 @@
 {
-	"name": "mockingfish-server",
+	"name": "mockingfish-api-server",
 	"version": "0.0.1",
 	"description": "API server for Mocking Fish app",
 	"author": "Hakon <hakon@madrona.com>",
@@ -9,10 +9,13 @@
 	"main": "server.js",
 	"respository": {
 		"type": "git",
-		"url": "https://github.com/hverespej/mockingfish-api-server"
+		"url": "https://github.com/hverespej/mockingfish-api-server.git"
 	},
 	"dependencies": {
 		"restify": "3.x.x",
 		"bunyan": "1.4.x"
+	},
+	"engines": {
+		"node": "0.10.x"
 	}
 }
