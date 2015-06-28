@@ -29,8 +29,18 @@ server.use(restify.acceptParser(server.acceptable));
 server.use(restify.requestLogger());
 
 server.get('/', function(req, res, next) {
-	res.send('Welcome to the MockingFish API');
-	return next();
+	fs.readFile('./app/index.html', 'utf8', function(err, file) {
+		if (err) {
+			res.status(500).send({ msg: 'Error reading file', error: err });
+			return next(err);
+		}
+
+		res.writeHead(200);
+		res.write(file);
+		res.end();
+
+		next();
+	});
 });
 
 // Serve app pages
