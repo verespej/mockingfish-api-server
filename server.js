@@ -12,20 +12,6 @@ var log = new bunyan.createLogger({
 	}
 });
 
-
-(function setupFfmpeg() {
-	var ffmpegExeName = 'ffmpeg';
-	var ffprobeExeName = 'ffprobe';
-	if (process.platform === 'win32') {
-		ffmpegExeName += '.exe';
-		ffprobeExeName += '.exe';
-	}
-	var ffmpegPath = path.join(__dirname, 'ffmpeg-bin', process.platform, process.arch, ffmpegExeName);
-	ffmpeg.setFfmpegPath(ffmpegPath);
-	var ffprobePath = path.join(__dirname, 'ffmpeg-bin', process.platform, process.arch, ffprobeExeName);
-	ffmpeg.setFfprobePath(ffprobePath);
-})();
-
 var server = restify.createServer({
 	name: 'mockingfish-api-server',
 	version: '0.0.1',
@@ -48,20 +34,7 @@ server.get('/', function(req, res, next) {
 
 // List editable videos
 server.get('/videos', function(req, res, next) {
-	fs.readdir(__dirname + '/videos', function(err, files) {
-		if (err) {
-			res.status(500).send({ msg: 'Error reading file', error: err });
-			return next(err);
-		}
-		var list = files.map(function(fileName) {
-			return {
-				id: fileName,
-				path: '/videos/' + fileName
-			};
-		});
-		res.send(list);
-		return next();
-	});
+	listDir('videos', req, res, next);
 });
 
 // Get editable video
@@ -71,20 +44,7 @@ server.get('/videos/:id', restify.serveStatic({
 
 // List video mixes
 server.get('/mixes', function(req, res, next) {
-	fs.readdir(__dirname + '/mixes', function(err, files) {
-		if (err) {
-			res.status(500).send({ msg: 'Error reading file', error: err });
-			return next(err);
-		}
-		var list = files.map(function(fileName) {
-			return {
-				id: fileName,
-				path: '/mixes/' + fileName
-			};
-		});
-		res.send(list);
-		return next();
-	});
+	listDir('mixes', req, res, next);
 });
 
 // Get video mix
@@ -108,6 +68,9 @@ server.post('/mixes', restify.jsonBodyParser(), function(req, res, next) {
 			res.status(500).send({ msg: 'Error processing video', error: err });
 		})
 		.on('end', function() {
+			console.log('Done creating audio file from video');
+			res.send('ok');
+
 			/*** Split ***
 			ffmpeg(baseAudioFile)
 				.addOptions([
@@ -129,7 +92,7 @@ server.post('/mixes', restify.jsonBodyParser(), function(req, res, next) {
 				.mergeToFile(path.join(__dirname, 'mixes', mixName), path.join(__dirname, 'tmp'));
 			*/
 
-			/*** File duration ***/
+			/*** File duration 
 			ffmpeg.ffprobe(baseAudioFile, function(err, metadata) {
 				if (err) {
 					console.log('Error reading audio file metadata: ' + err.message);
@@ -138,7 +101,7 @@ server.post('/mixes', restify.jsonBodyParser(), function(req, res, next) {
 				console.log(metadata.format.duration);
 				res.send('ok');
 			});
-			/* */
+			*/
 
 			/*** Replace audio ***
 			var outPath = getRandomFileName('mixes', 'mix-', '.mp4');
@@ -163,20 +126,7 @@ server.post('/mixes', restify.jsonBodyParser(), function(req, res, next) {
 
 // List audio clips
 server.get('/clips', function(req, res, next) {
-	fs.readdir(__dirname + '/clips', function(err, files) {
-		if (err) {
-			res.status(500).send({ msg: 'Error reading file', error: err });
-			return next(err);
-		}
-		var list = files.map(function(fileName) {
-			return {
-				id: fileName,
-				path: '/clips/' + fileName
-			};
-		});
-		res.send(list);
-		next();
-	});
+	listDir('clips', req, res, next);
 });
 
 // Get audio clip
@@ -205,6 +155,33 @@ server.post('/clips', function(req, res, next) {
 
 	next();
 });
+
+// List tmp dir
+server.get('/tmp', function(req, res, next) {
+	listDir('tmp', req, res, next);
+});
+
+// Get tmp items
+server.get('/tmp/:id', restify.serveStatic({
+	directory: __dirname
+}));
+
+function listDir(dirName, req, res, next) {
+	fs.readdir(path.join(__dirname, dirName), function(err, files) {
+		if (err) {
+			res.status(500).send({ msg: 'Error reading file', error: err });
+			return next(err);
+		}
+		var list = files.map(function(fileName) {
+			return {
+				id: fileName,
+				path: path.join('/', dirName, fileName)
+			};
+		});
+		res.send(list);
+		return next();
+	});
+}
 
 function getRandomFileName(subdir, prefix, ext) {
 	return tmp.tmpNameSync({
