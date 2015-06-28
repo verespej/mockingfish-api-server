@@ -33,6 +33,11 @@ server.get('/', function(req, res, next) {
 	return next();
 });
 
+// Serve app pages
+server.get('/app/:page', restify.serveStatic({
+	directory: __dirname
+}));
+
 // List editable videos
 server.get('/videos', function(req, res, next) {
 	listDir('videos', req, res, next);
@@ -55,7 +60,11 @@ server.get('/mixes/:id', restify.serveStatic({
 
 // Create mix
 server.post('/mixes', restify.jsonBodyParser(), function(req, res, next) {
-	var params = JSON.parse(req.body);
+console.log(req.body);
+	var params = req.body;
+	if (typeof(req.body) === 'string') {
+		params = JSON.parse(req.body);
+	}
 
 	var tmpDir = path.join(__dirname, 'tmp');
 	var baseFileName = path.parse(params.video).name;
@@ -234,9 +243,8 @@ server.get('/clips/:id', restify.serveStatic({
 server.post('/clips', function(req, res, next) {
 	// TODO: Use hash instead of tmp name
 	// TODO: Get audio format (& extension) from request
-
-	req.log.info('Initiating upload to ' + fPath);
 	var fPath = getRandomFileName('clips', 'clip-', 'mp3');
+	req.log.info('Initiating upload to ' + fPath);
 	var ws = fs.createWriteStream(fPath);
 	var rs = req.pipe(ws);
 
@@ -249,6 +257,14 @@ server.post('/clips', function(req, res, next) {
 		res.send({ id: path.basename(fPath) });
 	});
 
+	next();
+});
+
+server.post('/clips2', restify.bodyParser(), function(req, res, next) {
+	var fPath = getRandomFileName('clips', 'clip-', 'wav');
+	req.log.info('Saving web upload to ' + fPath);
+	fs.renameSync(req.files.data.path, fPath);
+	res.send({ id: path.basename(fPath) });
 	next();
 });
 

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<style>
+		table {
+			border-collapse: collapse;
+		}
+		table, tr, td {
+			border: 1px solid black;
+		}
+		td {
+			text-align: right;
+			padding: 5px;
+		}
+		.timeDisplay {
+			min-width: 80px;
+		}
+	</style>
+</head>
+<body>
+	<video id='vplayer' preload='auto' controls='true'>
+		<source src='../videos/omg-i-love-chipotle.mp4' type='video/mp4' />
+		HTML 5 not supported
+	</video>
+	<div>
+		<br />
+		<table>
+			<tr>
+				<td>Current Time</td><td class='timeDisplay'><span id='timeVal'>0</span>ms</td>
+			</tr>
+			<tr>
+				<td>Start Marker</td><td class='timeDisplay'><span id='startTime'>0</span>ms</td>
+			</tr>
+			<tr>
+				<td>End Marker</td><td class='timeDisplay'><span id='endTime'>0</span>ms</td>
+			</tr>
+			<tr>
+				<td>Marker Diff</td><td class='timeDisplay'><span id='diffTime'>0</span>ms</td>
+			</tr>
+		</table>
+		<br />
+		<button id='captureStartBtn'>Set Start Marker</button>
+		<button id='captureEndBtn'>Set End Marker</button><br />
+		<br />
+		<button id='jumpToStartBtn'>Jump to Start Marker</button>
+		<button id='jumpToEndBtn'>Jump to End Marker</button><br />
+		<br />
+		<input type='checkbox' id='stopAtEndTimeChkBx'>Stop playback at end time<br />
+		<br />
+	</div>
+
+  <h3>Recording</h3>
+	<audio controls></audio><button id='uploadAudio'>Upload Audio</button><br />
+  <button onclick='startRecording(this);'>Start Recording</button>
+  <button onclick='stopRecording(this);' disabled>Stop Recording</button><br />
+	<br />
+  <button id='genMeme'>Generate Meme</button><br />
+	<br />
+  
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+	<script>
+		function __log(e, data) {
+			console.log(e + ' ' + (data || ''));
+		}
+
+		var audio_context;
+		var recorder;
+
+		function startUserMedia(stream) {
+			__log('Starting user media');
+			var input = audio_context.createMediaStreamSource(stream);
+			__log('Media stream created.');
+
+			// Uncomment if you want the audio to feedback directly
+			//input.connect(audio_context.destination);
+			//__log('Input connected to audio context destination.');
+			
+			recorder = new Recorder(input);
+			__log('Recorder initialised.');
+		}
+
+		function startRecording(button) {
+			recorder && recorder.record();
+			button.disabled = true;
+			button.nextElementSibling.disabled = false;
+			__log('Recording...');
+		}
+
+		function stopRecording(button) {
+			recorder && recorder.stop();
+			button.disabled = true;
+			button.previousElementSibling.disabled = false;
+			__log('Stopped recording.');
+			
+			// create WAV download link using audio data blob
+			createUploadButton();
+			
+			recorder.clear();
+		}
+
+		var audioBlob;
+		var clipId;
+		function postAudio() {
+			var fd = new FormData();
+			fd.append('fname', 'clip.wav');
+			fd.append('data', audioBlob);
+			$.ajax({
+				type: 'POST',
+				url: '/clips2',
+				data: fd,
+				processData: false,
+				contentType: false
+			}).done(function(data) {
+				console.log(data);
+				clipId = data.id;
+			});
+		}
+
+		function createUploadButton() {
+			recorder && recorder.exportWAV(function(blob) {
+				audioBlob = blob;
+				$('audio').prop('src', URL.createObjectURL(blob));
+			});
+		}
+
+		/// 
+		/// Prep app
+		/// 
+		$(document).ready(function() {
+			try {
+				// webkit shim
+				window.AudioContext = window.AudioContext || window.webkitAudioContext;
+				navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia;
+				window.URL = window.URL || window.webkitURL;
+				
+				audio_context = new AudioContext;
+				__log('Audio context set up.');
+				__log('navigator.getUserMedia ' + (navigator.getUserMedia ? 'available.' : 'not present!'));
+			} catch (e) {
+				alert('No web audio support in this browser!');
+			}
+			
+			navigator.getUserMedia({audio: true}, startUserMedia, function(e) {
+				__log('No live audio input: ' + e);
+			});
+
+			function getVidTime() {
+				return Math.round($('#vplayer').prop('currentTime') * 1000);
+			}
+			function getStartTime(inSeconds) {
+				var t = parseInt($('#startTime').text());
+				if (typeof(inSeconds) !== 'undefined' && inSeconds) {
+					return t / 1000.0;
+				}
+				return t;
+			}
+			function getEndTime(inSeconds) {
+				var t = parseInt($('#endTime').text());
+				if (typeof(inSeconds) !== 'undefined' && inSeconds) {
+					return t / 1000.0;
+				}
+				return t;
+			}
+
+			function shouldStopAtEndTime() {
+				var checked = $('#stopAtEndTimeChkBx').prop('checked');
+				var timeInMs = getVidTime();
+				var endTime = getEndTime();
+				return typeof(checked) !== 'undefined' && 
+					checked !== false &&
+					endTime > 0 &&
+					timeInMs > endTime;
+			}
+
+			function updateDiff() {
+				var diff = getEndTime() - getStartTime();
+				$('#diffTime').text(diff);
+			}
+
+			$('#captureStartBtn').on('click', function() {
+				$('#startTime').text(getVidTime().toString());
+				updateDiff();
+			});
+			$('#captureEndBtn').on('click', function() {
+				$('#endTime').text(getVidTime().toString());
+				updateDiff();
+			});
+
+			$('#jumpToStartBtn').on('click', function() {
+				$('#vplayer').prop('currentTime', getStartTime(true));
+			});
+			$('#jumpToEndBtn').on('click', function() {
+				$('#vplayer').prop('currentTime', getEndTime(true));
+			});
+
+			$('#vplayer').on('play', function() {
+				if (shouldStopAtEndTime()) {
+					var player = $('#vplayer')[0];
+					player.pause();
+					player.currentTime = getEndTime(true);
+				}
+			});
+			$('#vplayer').on('timeupdate', function() {
+				if (shouldStopAtEndTime()) {
+					var player = $('#vplayer')[0];
+					player.pause();
+					player.currentTime = getEndTime(true);
+				}
+				$('#timeVal').text(getVidTime().toString());
+			});
+
+			$('#uploadAudio').on('click', postAudio);
+
+			$('#genMeme').on('click', function() {
+				$.ajax({
+					type: 'POST',
+					url: '/mixes',
+					contentType: "application/json; charset=utf-8",
+					dataType: "json",
+					data: JSON.stringify({
+						video: 'omg-i-love-chipotle.mp4',
+						splices: [
+							{
+								audio: clipId,
+								location: getStartTime(true)
+							}
+						]
+					})
+				}).done(function(data) {
+					alert('Created clip: ' + data.output);
+					console.log(data);
+				});
+			});
+		});
+	</script>
+  <script src="recorder.js"></script>
+
+</body>
+</html>
