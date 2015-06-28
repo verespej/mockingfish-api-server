@@ -1,0 +1,30 @@
+<html>
+	<head>
+	</head>
+	<body>
+		<h2>Videos</h2>
+		<ul id='videos'></ul>
+		<h2>Clips</h2>
+		<ul id='clips'></ul>
+		<h2>Mixes</h2>
+		<ul id='mixes'></ul>
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script>
+			function updateList(type) {
+				$.ajax({ type: 'GET', url: '/' + type }).fail(function(xhr, status, err) {
+					console.log('Error getting ' + type + ' list: ' + err);
+				}).done(function(data) {
+					$('#' + type).empty();
+					data.forEach(function(val) {
+						var html = '<li><a href=\'' + val.path + '\'>' + val.path + '</a></li>';
+						$('#' + type).append($(html));
+					});
+				});
+			}
+			updateList('videos');
+			updateList('clips');
+			updateList('mixes');
+		</script>
+	</body>
+</html>
+

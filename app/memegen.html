@@ -24,6 +24,9 @@
 	</video>
 	<div>
 		<br />
+		<input type='text' id='vidId' value='omg-i-love-chipotle.mp4' />
+		<button id='resetVid'>Reset Video</button><br /><br />
+		<br />
 		<table>
 			<tr>
 				<td>Current Time</td><td class='timeDisplay'><span id='timeVal'>0</span>ms</td>
@@ -50,9 +53,10 @@
 	</div>
 
   <h3>Recording</h3>
-	<audio controls></audio><button id='uploadAudio'>Upload Audio</button><br />
+	<audio controls></audio><br />
   <button onclick='startRecording(this);'>Start Recording</button>
-  <button onclick='stopRecording(this);' disabled>Stop Recording</button><br />
+  <button onclick='stopRecording(this);' disabled>Stop Recording</button>
+	<button id='uploadAudio'>Upload Audio</button><br />
 	<br />
   <button id='genMeme'>Generate Meme</button><br />
 	<br />
@@ -177,6 +181,10 @@
 				$('#diffTime').text(diff);
 			}
 
+			$('#resetVid').on('click', function() {
+				$('#vplayer').prop('src', '../videos/' + $('#vidId').prop('value'));
+			});
+
 			$('#captureStartBtn').on('click', function() {
 				$('#startTime').text(getVidTime().toString());
 				updateDiff();
@@ -218,7 +226,7 @@
 					contentType: "application/json; charset=utf-8",
 					dataType: "json",
 					data: JSON.stringify({
-						video: 'omg-i-love-chipotle.mp4',
+						video: $('#vidId').prop('value'),
 						splices: [
 							{
 								audio: clipId,

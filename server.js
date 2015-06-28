@@ -261,10 +261,25 @@ server.post('/clips', function(req, res, next) {
 });
 
 server.post('/clips2', restify.bodyParser(), function(req, res, next) {
-	var fPath = getRandomFileName('clips', 'clip-', 'wav');
-	req.log.info('Saving web upload to ' + fPath);
-	fs.renameSync(req.files.data.path, fPath);
-	res.send({ id: path.basename(fPath) });
+	var wavPath = getRandomFileName('clips', 'clip-', 'wav');
+	fs.renameSync(req.files.data.path, wavPath);
+
+	var mp3Path = getRandomFileName('clips', 'clip-', 'mp3');
+
+	req.log.info('Converting wav to mp3' + wavPath + ' to ' + mp3Path);
+
+	// TODO: Delete tmp file
+	ffmpeg(wavPath)
+		.audioCodec('libmp3lame')
+		.on('error', function(err) {
+			console.log('Error saving wav as mp3: ' + err.message);
+			res.status(500).send({ msg: 'Error saving wav as mp3', error: err });
+		})
+		.on('end', function() {
+			console.log('Saving wav as mp3 succeeded: ' + mp3Path);
+			res.send({ id: path.basename(mp3Path) });
+		})
+		.save(mp3Path);
 	next();
 });
 
@@ -287,7 +302,7 @@ function listDir(dirName, req, res, next) {
 		var list = files.map(function(fileName) {
 			return {
 				id: fileName,
-				path: path.join('/', dirName, fileName)
+				path: path.join('/', dirName, fileName).replace(new RegExp('\\\\', 'g'), '/')
 			};
 		});
 		res.send(list);
