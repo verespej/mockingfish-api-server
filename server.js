@@ -1,6 +1,8 @@
+var fs = require('fs');
+var path = require('path');
 var restify = require('restify');
 var bunyan = require('bunyan');
-var fs = require('fs');
+var tmp = require('tmp');
 
 var log = new bunyan.createLogger({
 	name: 'mockingfish-api-server',
@@ -23,7 +25,7 @@ server.pre(function(req, res, next) {
 
 server.use(restify.acceptParser(server.acceptable));
 server.use(restify.queryParser());
-server.use(restify.bodyParser());
+//server.use(restify.bodyParser());
 server.use(restify.requestLogger());
 
 server.get('/', function(req, res, next) {
@@ -91,7 +93,7 @@ server.get('/clips', function(req, res, next) {
 			};
 		});
 		res.send(list);
-		return next();
+		next();
 	});
 });
 
@@ -100,8 +102,38 @@ server.get('/clips/', restify.serveStatic({
 	directory: __dirname
 }));
 
+// Post audio clip
+server.post('/clips', function(req, res, next) {
+	// TODO: Use hash instead of tmp name
+	// TODO: Get audio format from request
+	tmp.tmpName({
+		dir: __dirname + '/clips/',
+		prefix: 'clip-',
+		postfix: '.mp3',
+		keep: true
+	}, function(err, fPath) {
+		if (err) {
+			res.status(500).send({ msg: 'Error creating temp file name', error: err });
+			next(err);
+		}
+			
+		req.log.info('Initiating upload to ' + fPath);
 
+		var ws = fs.createWriteStream(fPath);
+		var rs = req.pipe(ws);
 
+		rs.on('drain', function() {
+			req.log.info('Data segment uploaded...');
+		});
+
+		rs.on('finish', function() {
+			req.log.info('Upload complete ' + path.basename(fPath));
+			res.send({ id: path.basename(fPath) });
+		});
+
+		next();
+	});
+});
 
 server.listen(process.env.PORT || 5000, function() {
 	console.log(server.name + ' listening at ' + server.url);

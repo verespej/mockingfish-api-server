@@ -13,7 +13,8 @@
 	},
 	"dependencies": {
 		"restify": "3.x.x",
-		"bunyan": "1.4.x"
+		"bunyan": "1.4.x",
+		"tmp": "0.0.x"
 	},
 	"engines": {
 		"node": "0.12.x"
