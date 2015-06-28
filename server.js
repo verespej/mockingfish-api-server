@@ -57,81 +57,168 @@ server.get('/mixes/:id', restify.serveStatic({
 server.post('/mixes', restify.jsonBodyParser(), function(req, res, next) {
 	var params = JSON.parse(req.body);
 
+	var tmpDir = path.join(__dirname, 'tmp');
 	var baseFileName = path.parse(params.video).name;
 	var baseVideoFile = path.join(__dirname, 'videos', params.video);
-	var baseAudioFile = path.join(__dirname, 'tmp', baseFileName + '.mp3');
+	var baseAudioFile = path.join(tmpDir, baseFileName + '.mp3');
+	var replacementAudioFile = path.join(__dirname, 'clips', params.splices[0].audio);
+	var splitStart = params.splices[0].location;
+	var baseDuration;
+	var replacementDuration;
+
+	console.log({
+		tmpDir : tmpDir,
+		baseFileName : baseFileName,
+		baseVideoFile : baseVideoFile,
+		baseAudioFile : baseAudioFile,
+		replacementAudioFile : replacementAudioFile,
+		splitStart : splitStart
+	});
+
 
 	// TODO: Cache audio file to avoid recreation
 	console.log("starting");
-	(new Promise(function(resolve, reject) {
-		ffmpeg(baseVideoFile)
-			.audioCodec('libmp3lame')
-			.on('error', function(err) {
-				console.log('Error processing video: ' + err.message);
-				reject({ msg: 'Error processing video', error: err });
-			})
-			.on('end', function() {
-				console.log('Done creating audio file from video');
-				resolve();
-			})
-			.save(baseAudioFile);
-	})).then(function() {
-		console.log('Success');
-		res.send('ok');
+	extractAudio(baseVideoFile, baseAudioFile).then(function(aFile) {
+		return getAudioDuration(aFile).then(function(d) {
+			baseDuration = d;
+		});
+	}).then(function() {
+		return getAudioDuration(replacementAudioFile).then(function(d) {
+			replacementDuration = d;
+		});
+	}).then(function() {
+		// split audio 0 to start
+		return splitAudio(
+			baseAudioFile,
+			0,
+			splitStart,
+			baseAudioFile + '.1.mp3'
+		);
+	}).then(function(start) {
+		// split audio start to duration
+		return splitAudio(
+			baseAudioFile,
+			splitStart,
+			splitStart + replacementDuration,
+			baseAudioFile + '.2.mp3'
+		);
+	}).then(function() {
+		// split audio duration to end
+		return splitAudio(
+			baseAudioFile,
+			splitStart + replacementDuration,
+			baseDuration - (splitStart + replacementDuration),
+			baseAudioFile + '.3.mp3'
+		);
+	}).then(function() {
+		return concatAudio(
+			baseAudioFile + '.1.mp3',
+			replacementAudioFile,
+			baseAudioFile + '.3.mp3',
+			tmpDir,
+			baseAudioFile + '.final.mp3'
+		);
+	}).then(function(aFile) {
+		return replaceAudio(
+			baseVideoFile,
+			aFile,
+			getRandomFileName('mixes', 'mix-', 'mp4')
+		);
+	}).then(function(vFile) {
+		console.log('Success: ' + vFile);
+		res.send({ output: vFile });
 	}).catch(function(err) {
+		console.log(err);
 		res.status(500).send(err);
 	});
 
 	next();
 
-			/*** Split ***
-			ffmpeg(baseAudioFile)
-				.addOptions([
-					'-ss ' + params.splices[0].location, // Splice start
-					'-t ' + <audio length>, // Splice length
-				])
-				.save(
-			*/
-
-			/*** Concat ***
-			ffmpeg(input1).input(input2).input(input3)
-				.on('error', function(err) {
-					console.log('Error concatenating audio: ' + err.message);
-					res.status(500).send({ msg: 'Error concatenating audio', error: err });
-				})
-				.on('end', function() {
-					console.log('Concat complete');
-				})
-				.mergeToFile(path.join(__dirname, 'mixes', mixName), path.join(__dirname, 'tmp'));
-			*/
-
-			/*** File duration 
-			ffmpeg.ffprobe(baseAudioFile, function(err, metadata) {
-				if (err) {
-					console.log('Error reading audio file metadata: ' + err.message);
-					return res.status(500).send({ msg: 'Error reading audio file metadata', error: err });
-				}
-				console.log(metadata.format.duration);
-				res.send('ok');
-			});
-			*/
-
-			/*** Replace audio ***
-			var outPath = getRandomFileName('mixes', 'mix-', '.mp4');
-			ffmpeg(path.join(__dirname, 'videos', 'omg-i-love-chipotle.mp4'))
-				.input(path.join(__dirname, 'tmp', 'omg-i-love-javascript.mp3'))
-				.addOptions(['-map 0:0', '-map 1:0', '-c:v copy', '-c:a copy'])
-				.on('error', function(err) {
-					console.log('Error merging audio into video: ' + err);
-					res.status(500).send({ msg: 'Error merging audio into video', error: err });
-				})
-				.on('end', function() {
-					console.log('Success!');
-					res.send('ok');
-				})
-				.save(outPath);
-			*/
 });
+
+function getAudioDuration(aFile) {
+	return new Promise(function(resolve, reject) {
+		ffmpeg.ffprobe(aFile, function(err, metadata) {
+			if (err) {
+				console.log('Error getting audio duration: ' + err.message);
+				reject({ msg: 'Error getting audio duration', error: err });
+			}
+			console.log('Getting audio duration succeeded: ' + metadata.format.duration);
+			resolve(metadata.format.duration);
+		});
+	});
+}
+
+function extractAudio(vFile, output) {
+	return new Promise(function(resolve, reject) {
+		ffmpeg(vFile)
+			.audioCodec('libmp3lame')
+			.on('error', function(err) {
+				console.log('Error extracting audio from video: ' + err.message);
+				reject({ msg: 'Error extracting audio from video', error: err });
+			})
+			.on('end', function() {
+				console.log('Audio extraction succeeded: ' + output);
+				resolve(output);
+			})
+			.save(output);
+	});
+}
+
+function splitAudio(aFile, start, duration, output) {
+	return new Promise(function(resolve, reject) {
+		ffmpeg(aFile)
+			.addOptions([
+				'-ss ' +  start,
+				'-t ' + duration
+			])
+			.on('error', function(err) {
+				console.log('Error splitting audio: ' + err.message);
+				reject({ msg: 'Error splitting audio', error: err });
+			})
+			.on('end', function() {
+				console.log('Splitting audio succeeded: ' + output);
+				resolve(output);
+			})
+			.save(output);
+	});
+}
+
+function concatAudio(input1, input2, input3, tmpDir, output) {
+	return new Promise(function(resolve, reject) {
+		ffmpeg(input1).addInput(input2).addInput(input3)
+			.on('error', function(err) {
+				console.log('Error concatenating audio: ' + err.message);
+				reject({ msg: 'Error concatenating audio', error: err });
+			})
+			.on('end', function() {
+				console.log('Audio concat succeeded: ' + output);
+				resolve(output);
+			})
+			.mergeToFile(output, tmpDir);
+	});
+}
+
+function replaceAudio(vFile, aFile, output) {
+	return new Promise(function(resolve, reject) {
+		console.log({
+			vFile: vFile,
+			aFile: aFile,
+			output: output
+		});
+		ffmpeg(vFile).addInput(aFile)
+			.addOptions(['-map 0:0', '-map 1:0', '-c:v copy', '-c:a copy'])
+			.on('error', function(err) {
+				console.log('Error replacing audio: ' + err);
+				reject({ msg: 'Error replacing audio', error: err });
+			})
+			.on('end', function() {
+				console.log('Audio replacement succeeded: ' + output);
+				resolve(output);
+			})
+			.save(output);
+	});
+}
 
 // List audio clips
 server.get('/clips', function(req, res, next) {
@@ -149,7 +236,7 @@ server.post('/clips', function(req, res, next) {
 	// TODO: Get audio format (& extension) from request
 
 	req.log.info('Initiating upload to ' + fPath);
-	var fPath = getRandomFileName('clips', 'clip-', '.mp3');
+	var fPath = getRandomFileName('clips', 'clip-', 'mp3');
 	var ws = fs.createWriteStream(fPath);
 	var rs = req.pipe(ws);
 
@@ -196,7 +283,7 @@ function getRandomFileName(subdir, prefix, ext) {
 	return tmp.tmpNameSync({
 		dir: path.join(__dirname, subdir),
 		prefix: prefix,
-		postfix: ext,
+		postfix: '.' + ext,
 		keep: true
 	});
 }
