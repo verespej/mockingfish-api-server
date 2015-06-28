@@ -65,7 +65,7 @@ server.get('/videos', function(req, res, next) {
 });
 
 // Get editable video
-server.get('/videos/', restify.serveStatic({
+server.get('/videos/:id', restify.serveStatic({
 	directory: __dirname
 }));
 
@@ -88,7 +88,7 @@ server.get('/mixes', function(req, res, next) {
 });
 
 // Get video mix
-server.get('/mixes/', restify.serveStatic({
+server.get('/mixes/:id', restify.serveStatic({
 	directory: __dirname
 }));
 
@@ -180,7 +180,7 @@ server.get('/clips', function(req, res, next) {
 });
 
 // Get audio clip
-server.get('/clips/', restify.serveStatic({
+server.get('/clips/:id', restify.serveStatic({
 	directory: __dirname
 }));
 
