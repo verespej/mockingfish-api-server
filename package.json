@@ -15,7 +15,8 @@
 		"restify": "3.x.x",
 		"bunyan": "1.4.x",
 		"tmp": "0.0.x",
-		"fluent-ffmpeg": "2.x.x"
+		"fluent-ffmpeg": "2.x.x",
+		"bluebird": "2.9.x"
 	},
 	"engines": {
 		"node": "0.12.x"

@@ -1,3 +1,4 @@
+var Promise = require('bluebird');
 var fs = require('fs');
 var path = require('path');
 var restify = require('restify');
@@ -61,15 +62,27 @@ server.post('/mixes', restify.jsonBodyParser(), function(req, res, next) {
 	var baseAudioFile = path.join(__dirname, 'tmp', baseFileName + '.mp3');
 
 	// TODO: Cache audio file to avoid recreation
-	ffmpeg(baseVideoFile)
-		.audioCodec('libmp3lame')
-		.on('error', function(err) {
-			console.log('Error processing video: ' + err.message);
-			res.status(500).send({ msg: 'Error processing video', error: err });
-		})
-		.on('end', function() {
-			console.log('Done creating audio file from video');
-			res.send('ok');
+	console.log("starting");
+	(new Promise(function(resolve, reject) {
+		ffmpeg(baseVideoFile)
+			.audioCodec('libmp3lame')
+			.on('error', function(err) {
+				console.log('Error processing video: ' + err.message);
+				reject({ msg: 'Error processing video', error: err });
+			})
+			.on('end', function() {
+				console.log('Done creating audio file from video');
+				resolve();
+			})
+			.save(baseAudioFile);
+	})).then(function() {
+		console.log('Success');
+		res.send('ok');
+	}).catch(function(err) {
+		res.status(500).send(err);
+	});
+
+	next();
 
 			/*** Split ***
 			ffmpeg(baseAudioFile)
@@ -118,10 +131,6 @@ server.post('/mixes', restify.jsonBodyParser(), function(req, res, next) {
 				})
 				.save(outPath);
 			*/
-		})
-		.save(baseAudioFile);
-
-	next();
 });
 
 // List audio clips
